@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>数据生成控制台</title>
+
+<style>
+body { font-family: Arial; margin:40px; }
+input { margin:5px; padding:6px; width:140px; }
+button { padding:8px 14px; font-size:16px; cursor:pointer; }
+#status { margin-top:16px; font-weight:bold; }
+table { border-collapse: collapse; margin-top: 18px; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; font-size: 14px; vertical-align: top; }
+th { background: #f5f5f5; text-align: left; }
+.small { color:#666; font-size:12px; }
+a { cursor:pointer; }
+.btn-mini { padding: 4px 8px; font-size: 12px; }
+</style>
+</head>
+
+<body>
+<h2>数据生成控制台</h2>
+
+订单数量： <input id="order_cnt" value="5000">
+SKU数量： <input id="sku_cnt" value="2000">
+
+<br><br>
+<button onclick="createJob()">生成数据</button>
+
+<p id="status"></p>
+
+<h3>最近任务</h3>
+<div class="small">自动刷新（2 秒）｜每行支持：下载 / 重跑（Rerun）</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>创建时间</th>
+      <th>状态</th>
+      <th>参数</th>
+      <th>结果行数</th>
+      <th>操作</th>
+      <th>task_id</th>
+    </tr>
+  </thead>
+  <tbody id="jobsBody">
+    <tr><td colspan="6">加载中...</td></tr>
+  </tbody>
+</table>
+
+<script>
+// ✅ 同域：本地 / Cloudflare / 未来服务器都通用
+const API = "";
+
+let currentTaskId = null;
+
+async function createJob() {
+  const status = document.getElementById("status");
+  status.innerText = "提交任务中...";
+
+  try {
+    const res = await fetch(`${API}/jobs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "dev",
+        overrides: {
+          order_cnt: Number(document.getElementById("order_cnt").value),
+          sku_cnt: Number(document.getElementById("sku_cnt").value),
+        },
+        do_export: true
+      })
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      status.innerText = "提交失败: " + text;
+      return;
+    }
+
+    const data = await res.json();
+    currentTaskId = data.task_id;
+    status.innerText = `任务创建成功：${currentTaskId}，生成中...`;
+
+    pollCurrentTask();
+    refreshJobs();
+
+  } catch (e) {
+    console.error(e);
+    status.innerText = "请求失败（服务未启动或网络问题）";
+  }
+}
+
+async function pollCurrentTask() {
+  if (!currentTaskId) return;
+
+  const status = document.getElementById("status");
+
+  const timer = setInterval(async () => {
+    try {
+      const res = await fetch(`${API}/jobs/${currentTaskId}`);
+      const data = await res.json();
+
+      if (data.status === "queued") status.innerText = "排队中...";
+      if (data.status === "running") status.innerText = "生成中...";
+      if (data.status === "failed") {
+        clearInterval(timer);
+        status.innerText = "生成失败: " + data.error;
+        refreshJobs();
+      }
+      if (data.status === "done") {
+        clearInterval(timer);
+        status.innerText = "生成完成 ✅（在下方任务列表里下载/重跑）";
+        refreshJobs();
+      }
+
+    } catch (e) {
+      console.log(e);
+    }
+  }, 1500);
+}
+
+function escapeHtml(s) {
+  if (s == null) return "";
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function fmtParams(req) {
+  if (!req) return "-";
+  const ov = req.overrides || {};
+  const parts = [];
+  if (ov.order_cnt !== undefined) parts.push(`order_cnt=${ov.order_cnt}`);
+  if (ov.sku_cnt !== undefined) parts.push(`sku_cnt=${ov.sku_cnt}`);
+  return parts.length ? parts.join(", ") : "默认参数";
+}
+
+function fmtRows(rows) {
+  if (!rows) return "-";
+  const o = rows.orders ?? "-";
+  const it = rows.items ?? "-";
+  return `orders=${o}, items=${it}`;
+}
+
+function downloadZip(taskId) {
+  window.open(`${API}/jobs/${taskId}/download`, "_blank");
+}
+
+async function rerun(taskId) {
+  const status = document.getElementById("status");
+  status.innerText = `重跑中...（基于 ${taskId}）`;
+
+  try {
+    const res = await fetch(`${API}/jobs/${taskId}/rerun`, { method: "POST" });
+
+    if (!res.ok) {
+      const text = await res.text();
+      status.innerText = "重跑失败: " + text;
+      return;
+    }
+
+    const data = await res.json();
+    currentTaskId = data.task_id;
+    status.innerText = `已创建重跑任务：${currentTaskId}，生成中...`;
+
+    pollCurrentTask();
+    refreshJobs();
+
+  } catch (e) {
+    console.error(e);
+    status.innerText = "重跑请求失败";
+  }
+}
+
+async function refreshJobs() {
+  const body = document.getElementById("jobsBody");
+
+  try {
+    const res = await fetch(`${API}/jobs?limit=20`);
+    const data = await res.json();
+    const items = data.items || [];
+
+    if (items.length === 0) {
+      body.innerHTML = `<tr><td colspan="6">暂无任务</td></tr>`;
+      return;
+    }
+
+    body.innerHTML = items.map(it => {
+      const tid = it.task_id;
+      const st = it.status;
+      const created = it.created_at || "-";
+      const params = fmtParams(it.request);
+      const rows = fmtRows(it.rows);
+      const err = it.error ? `<div class="small">err: ${escapeHtml(it.error)}</div>` : "";
+      const src = it.source && it.source !== "normal" ? `<div class="small">src: ${escapeHtml(it.source)}</div>` : "";
+
+      const dlBtn = (st === "done")
+        ? `<button class="btn-mini" onclick="downloadZip('${tid}')">下载</button>`
+        : `<span class="small">-</span>`;
+
+      const rerunBtn = `<button class="btn-mini" onclick="rerun('${tid}')">重跑</button>`;
+
+      return `
+        <tr>
+          <td>${escapeHtml(created)}</td>
+          <td>${escapeHtml(st)}${err}${src}</td>
+          <td>${escapeHtml(params)}</td>
+          <td>${escapeHtml(rows)}</td>
+          <td>${dlBtn} ${rerunBtn}</td>
+          <td class="small">${escapeHtml(tid)}</td>
+        </tr>
+      `;
+    }).join("");
+
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="6">加载失败：${escapeHtml(e)}</td></tr>`;
+  }
+}
+
+// 页面启动后自动刷新列表
+refreshJobs();
+setInterval(refreshJobs, 2000);
+</script>
+</body>
+</html>
