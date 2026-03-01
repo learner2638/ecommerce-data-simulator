@@ -1,28 +1,81 @@
 # 🚀 Synthetic E-commerce Data Simulator
 
-A configurable **synthetic e-commerce data generation platform** designed for **Data Warehouse learning**, **SQL practice**, and **Big Data pipeline experiments**.
+A configurable **synthetic e-commerce data generation platform** designed for:
+
+* Data Warehouse Learning
+* SQL Practice
+* Big Data Pipeline Experiments
+* ETL Testing
+* Teaching Demonstrations
 
 This project solves a common problem in data engineering learning:
 
-> ❌ Tutorials assume data already exists  
-> ✅ This platform generates realistic business data from scratch
+❌ Tutorials assume data already exists
+✅ This platform generates realistic business data from scratch
 
 ---
 
-## ✨ Features
+## 🖥 Demo UI
 
-- ✅ Configurable dataset scale
-- ✅ Realistic order lifecycle simulation
-- ✅ Refund & fulfillment workflow
-- ✅ Data consistency validation
-- ✅ Hive ODS table export
-- ✅ Web UI control panel
-- ✅ Docker one-command deployment
-- ✅ Reproducible data generation
+Generate datasets through a Web control panel.
+
+![UI](docs/ui_1.png)
 
 ---
 
-## 🧱 Architecture
+## 🌍 Public Deployment (Cloudflare Tunnel)
+
+The service can be exposed publicly without server deployment.
+
+![deploy](docs/deploy.png)
+
+---
+
+## 🐳 Docker One-Command Run
+
+No environment setup required.
+
+```bash
+docker build -t data-sim .
+docker run -p 8000:8000 data-sim
+```
+
+![docker](docs/docker.png)
+
+---
+
+## 📦 Generated Dataset (ODS Layer)
+
+The platform exports ready-to-use warehouse datasets.
+
+![ods](docs/ods_files.png)
+
+Exported tables:
+
+* ods_orders
+* ods_order_items
+* ods_user_dim
+* ods_shop_dim
+* ods_sku_dim
+
+---
+
+## 📊 Sample Dataset Preview
+
+Realistic order lifecycle simulation:
+
+* UNPAID
+* PAID
+* SHIPPED
+* COMPLETED
+* CANCELLED
+* REFUND (FULL / PARTIAL)
+
+![sample](docs/orders_sample.png)
+
+---
+
+## 🧱 Project Architecture
 
 ```
 Data Generator
@@ -36,72 +89,11 @@ Data Warehouse Modeling Practice
 
 ---
 
-## 🐳 Quick Start (Recommended)
+## 📁 Project Structure
 
-### 1️⃣ Build Docker Image
+![code](docs/code.png)
 
-```bash
-docker build -t data-sim .
-```
-
----
-
-### 2️⃣ Run Service
-
-#### Windows PowerShell
-
-```bash
-docker run --rm -p 8000:8000 -v ${PWD}\out:/app/out data-sim
-```
-
-#### macOS / Linux
-
-```bash
-docker run --rm -p 8000:8000 -v $(pwd)/out:/app/out data-sim
-```
-
----
-
-### 3️⃣ Open Web Console
-
-Web UI:
-
-```
-http://127.0.0.1:8000/ui/
-```
-
-API Documentation:
-
-```
-http://127.0.0.1:8000/docs
-```
-
----
-
-## ⚙️ Usage
-
-1. Open Web UI
-2. Configure dataset parameters
-3. Click **Generate Data**
-4. Download generated dataset
-5. Import into Hive / MySQL / Spark
-
----
-
-## 📦 Output
-
-Generated datasets are exported to:
-
-```
-out/
-└── ods.zip
-```
-
-The folder is mounted from your host machine via Docker volume mapping.
-
----
-
-## 📂 Project Structure
+Core modules:
 
 ```
 web/            FastAPI service + Web UI
@@ -115,72 +107,60 @@ service.py      Job execution service
 
 ---
 
-## 🧠 Design Goals
+## ✨ Features
 
-This project aims to provide:
+* Configurable dataset scale
+* Realistic order lifecycle simulation
+* Refund & fulfillment workflow
+* Data consistency validation
+* Hive ODS export
+* Web UI control panel
+* Docker one-command deployment
+* Reproducible data generation
 
-- Realistic datasets for Data Warehouse practice
-- Repeatable ETL experiments
-- SQL interview preparation datasets
-- Teaching & demonstration environments
-- Big Data ecosystem testing data
+---
+
+## ⚙️ Quick Start
+
+### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Run Service
+
+```bash
+uvicorn web.app:app --host 0.0.0.0 --port 8000
+```
+
+Open:
+
+```
+http://127.0.0.1:8000/ui/
+```
+
+---
+
+## 🐳 Run With Docker
+
+```bash
+docker build -t data-sim .
+docker run --rm -p 8000:8000 -v $(pwd)/out:/app/out data-sim
+```
 
 ---
 
 ## 📘 Use Cases
 
-- Data Warehouse learning
-- SQL practice
-- ETL pipeline testing
-- Hive modeling exercises
-- Spark experimentation
-- Teaching demonstrations
+* Data Warehouse Practice
+* SQL Interview Preparation
+* Big Data Learning
+* ETL Pipeline Testing
+* Teaching & Demo Environment
 
 ---
 
-## 🔥 Why Docker?
-
-Docker enables:
-
-- No environment setup required
-- One-command startup
-- Identical runtime environments
-- Easy sharing & evaluation
-
-Anyone can run the platform with:
-
-```bash
-docker run data-sim
-```
-
----
-
-## 🛠 Tech Stack
-
-- Python
-- FastAPI
-- Data Warehouse Modeling
-- Hive SQL
-- Docker
-
----
-
-## 🪪 License
+## 📜 License
 
 MIT License
-
----
-
-## ⭐ If this project helps you
-
-Give it a **Star** ⭐ on GitHub!
-
-```
-Real data engineering starts from real data.
-```
-
----
-
-## 👨‍💻 Author
-
-Built for data engineering learners who want **realistic practice environments**.
