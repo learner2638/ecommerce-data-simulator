@@ -1,9 +1,5 @@
 # 🚀 Synthetic E-commerce Data Simulator
 
-![Python](https://img.shields.io/badge/python-3.11-blue)
-![Docker](https://img.shields.io/badge/docker-supported-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-
 A configurable **synthetic e-commerce data generation platform** designed for:
 
 - Data Warehouse Learning
@@ -25,7 +21,7 @@ Generate datasets through a Web control panel.
 
 ![UI](docs/ui_2.png)
 
-The UI allows configuring:
+Users can configure:
 
 - order count
 - user count
@@ -36,42 +32,61 @@ Datasets can be generated directly from the browser.
 
 ---
 
-# 🌍 Public Deployment (Cloudflare Tunnel)
+# ⚡ Performance Benchmark
 
-The service can be exposed publicly without server deployment.
+Example generation performance.
 
-![deploy](docs/deploy.png)
+![speed](docs/speed.png)
 
-Architecture:
+Example configuration:
 
-```
-Local FastAPI Service
-        ↓
-Cloudflare Tunnel
-        ↓
-Public Internet Access
-```
+| Parameter | Value |
+|-----------|------:|
+| Orders | 10,000,000 |
+| Users | 120,000 |
+| Shops | 8,000 |
+| SKUs | 35,000 |
+| Workers | 6 |
 
-This allows sharing the simulator with others without renting servers.
+Generation result:
 
----
+| Metric | Result |
+|------|------:|
+| Orders Generated | 10,000,000 |
+| Order Items | ~25,000,000 |
+| Time Elapsed | ~74 seconds |
 
-# 🐳 Docker One-Command Run
-
-No environment setup required.
-
-```bash
-docker build -t data-sim .
-docker run -p 8000:8000 data-sim
-```
-
-![docker](docs/docker.png)
-
-Open in browser:
+Example worker logs:
 
 ```
-http://localhost:8000/ui/
+[worker-1] 3333332/3333332
+[worker-2] 4999998/4999998
+[worker-3] 6666664/6666664
+[worker-4] 8333330/8333330
+[worker-5] 10000000/10000000
+done
+elapsed=74.74s
 ```
+### Average Generation Speed
+
+Based on the benchmark above:
+
+- **10,000,000 orders generated in ~74 seconds**
+
+Average generation speed:
+
+```
+≈ 135,000 orders / second
+```
+
+Including order items:
+
+```
+≈ 190,000 rows / second
+```
+
+This performance is achieved through **parallel streaming generation with multiple workers**, allowing large-scale datasets to be produced efficiently on a standard laptop.
+Parallel generation significantly improves throughput while keeping memory usage stable.
 
 ---
 
@@ -123,43 +138,42 @@ The simulator generates:
 
 ---
 
-# ⚡ Performance Benchmark
+# 🌍 Public Deployment (Cloudflare Tunnel)
 
-Example generation performance.
+The service can be exposed publicly without server deployment.
 
-![speed](docs/speed.png)
+![deploy](docs/deploy.png)
 
-Example configuration:
-
-| Parameter | Value |
-|-----------|------:|
-| Orders | 10,000,000 |
-| Users | 120,000 |
-| Shops | 8,000 |
-| SKUs | 35,000 |
-| Workers | 6 |
-
-Generation result:
-
-| Metric | Result |
-|------|------:|
-| Orders Generated | 10,000,000 |
-| Order Items | ~25,000,000 |
-| Time Elapsed | ~74 seconds |
-
-Example worker logs:
+Architecture:
 
 ```
-[worker-1] 3333332/3333332
-[worker-2] 4999998/4999998
-[worker-3] 6666664/6666664
-[worker-4] 8333330/8333330
-[worker-5] 10000000/10000000
-done
-elapsed=74.74s
+Local FastAPI Service
+        ↓
+Cloudflare Tunnel
+        ↓
+Public Internet Access
 ```
 
-Parallel generation significantly improves throughput.
+This allows sharing the simulator with others without renting servers.
+
+---
+
+# 🐳 Docker One-Command Run
+
+No environment setup required.
+
+```bash
+docker build -t data-sim .
+docker run -p 8000:8000 data-sim
+```
+
+![docker](docs/docker.png)
+
+Then open:
+
+```
+http://localhost:8000/ui/
+```
 
 ---
 
@@ -200,69 +214,8 @@ service.py      Job execution service
 - Hive-ready ODS export
 - Web UI control panel
 - Docker one-command deployment
+- Parallel dataset generation
 - Reproducible data generation
-- Parallel dataset generation engine
-
----
-
-# 🧠 Design Concepts
-
-### Synthetic Business Data
-
-The generator simulates real business behavior:
-
-- users
-- shops
-- products
-- orders
-- order items
-- refunds
-
-This enables realistic **data warehouse practice environments**.
-
----
-
-### Parallel Data Generation
-
-The system uses multi-process workers.
-
-Example configuration:
-
-```
-workers = 6
-batch_size = 300000
-```
-
-Benefits:
-
-- faster generation
-- scalable datasets
-- stable memory usage
-
----
-
-### Warehouse-Oriented Dataset
-
-The simulator exports **ODS layer datasets**.
-
-Typical learning pipeline:
-
-```
-ODS
- ↓
-DWD
- ↓
-DWS
- ↓
-BI
-```
-
-Students can practice:
-
-- dimensional modeling
-- ETL development
-- analytical SQL
-- warehouse architecture
 
 ---
 
@@ -338,7 +291,7 @@ This project can be used for:
 
 # 🚧 Roadmap
 
-Future improvements:
+Planned improvements:
 
 - Parquet / ORC dataset export
 - Kafka streaming generation
