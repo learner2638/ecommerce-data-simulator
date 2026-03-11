@@ -1,0 +1,13 @@
+INSERT OVERERITE TABLE dws_user_day_order_cnt
+PARTITION(dt='${biz_date}')
+SELECT
+    user_id,
+    COUNT(DISTINCT order_id) AS dws_user_day_order_cnt
+    FROM fact_order
+    WHERE 1=1
+    AND dt='${biz_date}'
+    AND user_id IS NOT NULL
+    AND order_id IS NOT NULL
+    AND order_time IS NOT NULL
+    AND TO_DATE(order_time)='${biz_date}'
+    GROUP BY user_id;

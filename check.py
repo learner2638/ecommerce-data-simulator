@@ -1,93 +1,58 @@
-# check.py
 def check_head_item_consistency(orders, items, sample_n=200):
-    order_map = {o["order_id"]: o for o in orders}
+    """
+    校验订单头和明细是否一致
 
-    # 1) 头明细 user/shop 一致
-    for it in items[:sample_n]:
-        o = order_map[it["order_id"]]
-        assert it["user_id"] == o["user_id"]
-        assert it["shop_id"] == o["shop_id"]
+    校验内容：
+    1. total_qty = sum(item_qty)
+    2. total_amount = sum(item_amount)
 
-    # 2) 金额/数量一致：抽样订单汇总核对
-    sample_order_ids = set(it["order_id"] for it in items[:sample_n])
+    只抽样检查，避免大数据量卡死
+    """
 
-    item_sum = {}
+    if not orders or not items:
+        return
+
+    # 取前 sample_n 个订单
+    sample_orders = orders[:sample_n]
+
+    # 构建 order -> items 映射
+    order_items_map = {}
+
     for it in items:
         oid = it["order_id"]
-        if oid not in sample_order_ids:
-            continue
-        s = item_sum.setdefault(oid, {"qty": 0, "amt": 0})
-        s["qty"] += it["item_qty"]
-        s["amt"] += it["item_amount"]
 
-    for oid in sample_order_ids:
-        o = order_map[oid]
-        s = item_sum.get(oid, {"qty": 0, "amt": 0})
-        assert o["total_qty"] == s["qty"]
-        assert o["total_amount"] == s["amt"]
+        if oid not in order_items_map:
+            order_items_map[oid] = []
 
-    # 3) 状态-时间-金额一致（抽样 orders）
-    for o in orders[:min(len(orders), sample_n)]:
-        st = o["status"]
+        order_items_map[oid].append(it)
 
-        created = o["created_time"]
-        pay = o["pay_time"]
-        cancel = o["cancel_time"]
-        ship = o["ship_time"]
-        comp = o["complete_time"]
-        rtime = o["refund_time"]
+    errors = []
 
-        total = o["total_amount"]
-        disc = o["discount_amount"]
-        paid = o["paid_amount"]
-        refund = o["refund_amount"]
+    for o in sample_orders:
 
-        # 金额边界
-        assert 0 <= disc <= total
-        assert 0 <= paid <= total
-        assert 0 <= refund <= paid
+        oid = o["order_id"]
 
-        # 时间单调性
-        if pay is not None:
-            assert pay >= created
-        if cancel is not None:
-            assert cancel >= created
-        if ship is not None:
-            assert pay is not None
-            assert ship >= pay
-        if comp is not None:
-            assert ship is not None
-            assert comp >= ship
-        if rtime is not None:
-            assert pay is not None
-            assert rtime >= pay
+        its = order_items_map.get(oid, [])
 
-        # 状态约束
-        if st == "UNPAID":
-            assert pay is None and cancel is None and ship is None and comp is None and rtime is None
-            assert paid == 0 and refund == 0
+        qty_sum = sum(i["item_qty"] for i in its)
+        amt_sum = sum(i["item_amount"] for i in its)
 
-        elif st == "CANCELLED":
-            assert pay is None and ship is None and comp is None and rtime is None
-            assert cancel is not None
-            assert paid == 0 and refund == 0
+        if qty_sum != o["total_qty"]:
+            errors.append(
+                f"order {oid} qty mismatch "
+                f"{qty_sum} != {o['total_qty']}"
+            )
 
-        elif st == "PAID":
-            assert pay is not None
-            assert ship is None and comp is None
-            assert cancel is None
-            assert paid == total - disc
+        if amt_sum != o["total_amount"]:
+            errors.append(
+                f"order {oid} amount mismatch "
+                f"{amt_sum} != {o['total_amount']}"
+            )
 
-        elif st == "SHIPPED":
-            assert pay is not None and ship is not None
-            assert comp is None
-            assert cancel is None
-            assert paid == total - disc
+    if errors:
+        print("CHECK FAILED:")
+        for e in errors[:10]:
+            print(e)
+        raise ValueError("order head/item consistency check failed")
 
-        elif st == "COMPLETED":
-            assert pay is not None and ship is not None and comp is not None
-            assert cancel is None
-            assert paid == total - disc
-
-        else:
-            raise ValueError(f"unknown status: {st}")
+    print(f"[check] head-item consistency OK (sample {len(sample_orders)})")

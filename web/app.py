@@ -9,7 +9,8 @@ from datetime import datetime
 import uuid
 import threading
 
-from service import run_once
+from service import run_once_stream
+
 
 # ========================
 # App
@@ -17,11 +18,11 @@ from service import run_once
 app = FastAPI()
 
 # ========================
-# CORS（同域后其实不需要，但保留无伤）
+# CORS
 # ========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 开发期全放开
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,8 +31,8 @@ app.add_middleware(
 # ========================
 # 静态网页挂载：/ui
 # ========================
-BASE_DIR = Path(__file__).resolve().parent        # .../web
-STATIC_DIR = BASE_DIR / "static"                 # .../web/static
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
 
 app.mount("/ui", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
@@ -46,24 +47,25 @@ def home():
 # ========================
 TASKS = {}
 
-# ✅ 最低成本护栏：防误操作写爆机器
-MAX_ORDER_CNT = 200_000
-MAX_SKU_CNT = 200_000
-
-# ✅ 可选：限制同时运行/排队的任务数（不想要就改大点或删掉）
+MAX_ORDER_CNT = 10_000_000
+MAX_SKU_CNT = 1_000_000
+MAX_USER_CNT = 2_000_000
+MAX_BATCH_SIZE = 500_000
 MAX_ACTIVE_JOBS = 3
 
 
 class JobReq(BaseModel):
-    mode: str = "dev"
+    mode: str = "prod"
     overrides: dict = {}
+    batch_size: int = 50000
     do_export: bool = True
 
 
 def _apply_guardrails(req: JobReq) -> None:
-    """限制生成规模，避免 CPU/磁盘被误操作打爆。"""
     oc = req.overrides.get("order_cnt", None)
     sc = req.overrides.get("sku_cnt", None)
+    uc = req.overrides.get("user_cnt", None)
+    bs = req.batch_size
 
     if oc is not None:
         try:
@@ -85,6 +87,27 @@ def _apply_guardrails(req: JobReq) -> None:
         if sc > MAX_SKU_CNT:
             raise HTTPException(400, f"sku_cnt too large (max {MAX_SKU_CNT})")
 
+    if uc is not None:
+        try:
+            uc = int(uc)
+        except Exception:
+            raise HTTPException(400, "user_cnt must be int")
+        if uc <= 0:
+            raise HTTPException(400, "user_cnt must be > 0")
+        if uc > MAX_USER_CNT:
+            raise HTTPException(400, f"user_cnt too large (max {MAX_USER_CNT})")
+
+    try:
+        bs = int(bs)
+    except Exception:
+        raise HTTPException(400, "batch_size must be int")
+
+    if bs <= 0:
+        raise HTTPException(400, "batch_size must be > 0")
+
+    if bs > MAX_BATCH_SIZE:
+        raise HTTPException(400, f"batch_size too large (max {MAX_BATCH_SIZE})")
+
 
 def _active_jobs_count() -> int:
     return sum(
@@ -96,15 +119,22 @@ def _active_jobs_count() -> int:
 def worker(task_id: str, req: JobReq):
     try:
         TASKS[task_id]["status"] = "running"
+        TASKS[task_id]["progress"] = "starting"
 
-        result = run_once(
+        def progress_cb(done_orders, total_orders, total_items):
+            TASKS[task_id]["progress"] = f"{done_orders}/{total_orders}, items={total_items}"
+
+        result = run_once_stream(
             mode=req.mode,
             overrides=req.overrides,
+            batch_size=req.batch_size,
             do_export=req.do_export,
+            progress_callback=progress_cb,
         )
 
         TASKS[task_id]["status"] = "done"
         TASKS[task_id]["result"] = result
+        TASKS[task_id]["progress"] = "done"
 
     except Exception as e:
         TASKS[task_id]["status"] = "failed"
@@ -112,7 +142,6 @@ def worker(task_id: str, req: JobReq):
 
 
 def _create_task(req: JobReq) -> str:
-    """统一创建任务入口（给 create_job 和 rerun 共用）"""
     _apply_guardrails(req)
 
     if _active_jobs_count() >= MAX_ACTIVE_JOBS:
@@ -121,15 +150,16 @@ def _create_task(req: JobReq) -> str:
     task_id = str(uuid.uuid4())
     TASKS[task_id] = {
         "status": "queued",
+        "progress": "",
         "result": None,
         "error": None,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "request": {
             "mode": req.mode,
             "overrides": req.overrides,
+            "batch_size": req.batch_size,
             "do_export": req.do_export,
         },
-        # ✅ 记录来源（可选）：normal / rerun
         "source": "normal",
     }
 
@@ -149,7 +179,6 @@ def create_job(req: JobReq):
 
 @app.get("/jobs")
 def list_jobs(limit: int = 20):
-    """最近任务列表（给前端表格用）"""
     limit = max(1, min(int(limit), 200))
 
     def key_fn(tid: str):
@@ -163,6 +192,7 @@ def list_jobs(limit: int = 20):
         items.append({
             "task_id": tid,
             "status": t.get("status"),
+            "progress": t.get("progress"),
             "created_at": t.get("created_at"),
             "request": t.get("request"),
             "error": t.get("error"),
@@ -183,19 +213,22 @@ def get_job(task_id: str):
 
 @app.post("/jobs/{task_id}/rerun")
 def rerun_job(task_id: str):
-    """
-    ✅ Rerun：用历史任务当时的参数，再创建一个新任务
-    """
     old = TASKS.get(task_id)
     if not old:
         raise HTTPException(404, "task_id not found")
 
     req_obj = old.get("request") or {}
-    mode = req_obj.get("mode", "dev")
+    mode = req_obj.get("mode", "prod")
     overrides = req_obj.get("overrides", {}) or {}
+    batch_size = int(req_obj.get("batch_size", 50000))
     do_export = bool(req_obj.get("do_export", True))
 
-    new_req = JobReq(mode=mode, overrides=overrides, do_export=do_export)
+    new_req = JobReq(
+        mode=mode,
+        overrides=overrides,
+        batch_size=batch_size,
+        do_export=do_export,
+    )
 
     new_task_id = _create_task(new_req)
     TASKS[new_task_id]["source"] = f"rerun:{task_id}"

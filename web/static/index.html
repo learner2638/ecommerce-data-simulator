@@ -15,16 +15,25 @@ th { background: #f5f5f5; text-align: left; }
 .small { color:#666; font-size:12px; }
 a { cursor:pointer; }
 .btn-mini { padding: 4px 8px; font-size: 12px; }
+.row { margin-bottom: 10px; }
+label { display:inline-block; width:100px; }
 </style>
 </head>
 
 <body>
 <h2>数据生成控制台</h2>
 
-订单数量： <input id="order_cnt" value="5000">
-SKU数量： <input id="sku_cnt" value="2000">
+<div class="row">
+  <label>订单数量：</label><input id="order_cnt" value="500000">
+  <label>用户数量：</label><input id="user_cnt" value="100000">
+</div>
 
-<br><br>
+<div class="row">
+  <label>SKU数量：</label><input id="sku_cnt" value="20000">
+  <label>批大小：</label><input id="batch_size" value="50000">
+</div>
+
+<br>
 <button onclick="createJob()">生成数据</button>
 
 <p id="status"></p>
@@ -49,9 +58,7 @@ SKU数量： <input id="sku_cnt" value="2000">
 </table>
 
 <script>
-// ✅ 同域：本地 / Cloudflare / 未来服务器都通用
 const API = "";
-
 let currentTaskId = null;
 
 async function createJob() {
@@ -59,17 +66,21 @@ async function createJob() {
   status.innerText = "提交任务中...";
 
   try {
+    const payload = {
+      mode: "prod",
+      overrides: {
+        order_cnt: Number(document.getElementById("order_cnt").value),
+        user_cnt: Number(document.getElementById("user_cnt").value),
+        sku_cnt: Number(document.getElementById("sku_cnt").value),
+      },
+      batch_size: Number(document.getElementById("batch_size").value),
+      do_export: true
+    };
+
     const res = await fetch(`${API}/jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mode: "dev",
-        overrides: {
-          order_cnt: Number(document.getElementById("order_cnt").value),
-          sku_cnt: Number(document.getElementById("sku_cnt").value),
-        },
-        do_export: true
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!res.ok) {
@@ -101,13 +112,21 @@ async function pollCurrentTask() {
       const res = await fetch(`${API}/jobs/${currentTaskId}`);
       const data = await res.json();
 
-      if (data.status === "queued") status.innerText = "排队中...";
-      if (data.status === "running") status.innerText = "生成中...";
+      if (data.status === "queued") {
+        status.innerText = "排队中...";
+      }
+
+      if (data.status === "running") {
+        const prog = data.progress ? `｜进度: ${data.progress}` : "";
+        status.innerText = "生成中..." + prog;
+      }
+
       if (data.status === "failed") {
         clearInterval(timer);
         status.innerText = "生成失败: " + data.error;
         refreshJobs();
       }
+
       if (data.status === "done") {
         clearInterval(timer);
         status.innerText = "生成完成 ✅（在下方任务列表里下载/重跑）";
@@ -132,8 +151,12 @@ function fmtParams(req) {
   if (!req) return "-";
   const ov = req.overrides || {};
   const parts = [];
+
   if (ov.order_cnt !== undefined) parts.push(`order_cnt=${ov.order_cnt}`);
+  if (ov.user_cnt !== undefined) parts.push(`user_cnt=${ov.user_cnt}`);
   if (ov.sku_cnt !== undefined) parts.push(`sku_cnt=${ov.sku_cnt}`);
+  if (req.batch_size !== undefined) parts.push(`batch_size=${req.batch_size}`);
+
   return parts.length ? parts.join(", ") : "默认参数";
 }
 
@@ -195,6 +218,7 @@ async function refreshJobs() {
       const rows = fmtRows(it.rows);
       const err = it.error ? `<div class="small">err: ${escapeHtml(it.error)}</div>` : "";
       const src = it.source && it.source !== "normal" ? `<div class="small">src: ${escapeHtml(it.source)}</div>` : "";
+      const prog = it.progress ? `<div class="small">progress: ${escapeHtml(it.progress)}</div>` : "";
 
       const dlBtn = (st === "done")
         ? `<button class="btn-mini" onclick="downloadZip('${tid}')">下载</button>`
@@ -205,7 +229,7 @@ async function refreshJobs() {
       return `
         <tr>
           <td>${escapeHtml(created)}</td>
-          <td>${escapeHtml(st)}${err}${src}</td>
+          <td>${escapeHtml(st)}${prog}${err}${src}</td>
           <td>${escapeHtml(params)}</td>
           <td>${escapeHtml(rows)}</td>
           <td>${dlBtn} ${rerunBtn}</td>
@@ -219,7 +243,6 @@ async function refreshJobs() {
   }
 }
 
-// 页面启动后自动刷新列表
 refreshJobs();
 setInterval(refreshJobs, 2000);
 </script>
