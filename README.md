@@ -1,95 +1,101 @@
-<<<<<<< HEAD
-# Ecommerce Data Simulator
+# 🚀 Synthetic E-commerce Data Simulator
 
-## Project Introduction
+A configurable **synthetic e-commerce data generation platform** designed for:
 
-This project simulates e-commerce business data for data warehouse learning.
+* Data Warehouse Learning
+* SQL Practice
+* Big Data Pipeline Experiments
+* ETL Testing
+* Teaching Demonstrations
 
-Workflow:
-Data Generation → ODS → Hive Modeling → API Service
+This project solves a common problem in data engineering learning:
 
-## Tech Stack
-
-* Python
-* FastAPI
-* Hive SQL
-* Data Warehouse Modeling
-
-## Run
-
-pip install -r requirements.txt
-
-uvicorn web.app:app --host 0.0.0.0 --port 10000
-=======
-# Synthetic E-commerce Data Simulator
-
-A configurable synthetic data generation platform for e-commerce data warehouse practice.
-
-This project simulates realistic e-commerce datasets for data warehouse learning, SQL practice, and big data pipeline experiments.
+❌ Tutorials assume data already exists
+✅ This platform generates realistic business data from scratch
 
 ---
 
-## ✨ Features
+## 🖥 Demo UI
 
-* Configurable data scale
-* Realistic order lifecycle simulation
-* Refund & fulfillment workflow
-* Data consistency validation
-* Hive ODS export
-* Web UI control panel
-* Docker one-command deployment
+Generate datasets through a Web control panel.
+
+![UI](docs/ui_1.png)
 
 ---
 
-## 🚀 Quick Start (Docker)
+## 🌍 Public Deployment (Cloudflare Tunnel)
 
-### Build Image
+The service can be exposed publicly without server deployment.
 
+![deploy](docs/deploy.png)
+
+---
+
+## 🐳 Docker One-Command Run
+
+No environment setup required.
+
+```bash
 docker build -t data-sim .
+docker run -p 8000:8000 data-sim
+```
 
-### Run Service (Windows PowerShell)
-
-docker run --rm -p 8000:8000 -v ${PWD}\out:/app/out data-sim
-
-### Run Service (macOS / Linux)
-
-docker run --rm -p 8000:8000 -v $(pwd)/out:/app/out data-sim
+![docker](docs/docker.png)
 
 ---
 
-### Open Web Console
+## 📦 Generated Dataset (ODS Layer)
 
-Web UI
-http://127.0.0.1:8000/ui/
+The platform exports ready-to-use warehouse datasets.
 
-API Docs
-http://127.0.0.1:8000/docs
+![ods](docs/ods_files.png)
 
----
+Exported tables:
 
-## 📦 Output Files
-
-Generated datasets are exported to:
-
-out/
-└── ods.zip
-
-The folder is mounted from host machine via Docker volume mapping.
+* ods_orders
+* ods_order_items
+* ods_user_dim
+* ods_shop_dim
+* ods_sku_dim
 
 ---
 
-## ⚙️ Usage
+## 📊 Sample Dataset Preview
 
-1. Open Web UI
-2. Configure dataset parameters
-3. Click Generate Data
-4. Download ods.zip
-5. Import into Hive / MySQL / Spark
+Realistic order lifecycle simulation:
+
+* UNPAID
+* PAID
+* SHIPPED
+* COMPLETED
+* CANCELLED
+* REFUND (FULL / PARTIAL)
+
+![sample](docs/orders_sample.png)
 
 ---
 
-## 🧱 Project Structure
+## 🧱 Project Architecture
 
+```
+Data Generator
+      ↓
+ODS Dataset Export
+      ↓
+Hive / MySQL / Spark
+      ↓
+Data Warehouse Modeling Practice
+```
+
+---
+
+## 📁 Project Structure
+
+![code](docs/code.png)
+
+Core modules:
+
+```
 web/            FastAPI service + Web UI
 config.py       Simulation configuration
 pipeline.py     Dataset pipeline builder
@@ -97,35 +103,64 @@ facts.py        Fact table generator
 dims.py         Dimension generator
 exporter.py     ODS export logic
 service.py      Job execution service
+```
 
 ---
 
-## 🐳 Why Docker?
+## ✨ Features
 
-Docker provides:
-
-* No environment setup required
-* One-command startup
+* Configurable dataset scale
+* Realistic order lifecycle simulation
+* Refund & fulfillment workflow
+* Data consistency validation
+* Hive ODS export
+* Web UI control panel
+* Docker one-command deployment
 * Reproducible data generation
-* Easy sharing & evaluation
 
-Anyone can run the platform with:
+---
 
-docker run data-sim
+## ⚙️ Quick Start
+
+### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Run Service
+
+```bash
+uvicorn web.app:app --host 0.0.0.0 --port 8000
+```
+
+Open:
+
+```
+http://127.0.0.1:8000/ui/
+```
+
+---
+
+## 🐳 Run With Docker
+
+```bash
+docker build -t data-sim .
+docker run --rm -p 8000:8000 -v $(pwd)/out:/app/out data-sim
+```
 
 ---
 
 ## 📘 Use Cases
 
-* Data Warehouse practice
-* SQL interview preparation
-* ETL testing
-* Big Data learning
-* Teaching demonstrations
+* Data Warehouse Practice
+* SQL Interview Preparation
+* Big Data Learning
+* ETL Pipeline Testing
+* Teaching & Demo Environment
 
 ---
 
-## License
+## 📜 License
 
 MIT License
->>>>>>> 7834130 (add docker one-click run and improve README)
